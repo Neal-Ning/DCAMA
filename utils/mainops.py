@@ -20,6 +20,10 @@ load_dotenv()
 t212_api = os.getenv('T212P_API')
 t212_sck = os.getenv('T212P_SCK')
 
+# Must exist before logging.basicConfig below opens app.log inside it - on a
+# first-ever run (no prior database/ folder) that write would otherwise fail
+# at import time, before main.py's own crash handling even starts.
+os.makedirs("database", exist_ok=True)
 
 logging.basicConfig(
     filename="database/app.log",
@@ -303,6 +307,18 @@ def update_ticker(yticker, after):
     return 0
 
     
+# standings/last only exist once "/setup {amount}" has created them - every
+# other command that touches the DB must check first, or a fresh deployment
+# crashes the whole bot-listener thread on "no such table".
+def _is_initialized():
+    conn = sqlite3.connect("database/accum.db")
+    exists = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='standings'"
+    ).fetchone() is not None
+    conn.close()
+    return exists
+
+
 # Text commands the user can send the bot: "/setup" or "/setup {amount}" to
 # (re)initialize and invest, "/depo {amount}" to allocate a deposit,
 # "/setup {"TICKER": amount, ...}" as a fallback to directly overwrite one or
@@ -318,6 +334,10 @@ def handle_message(text, chat_id):
 
     if command == "/setup":
         if arg.startswith("{"):
+            if not _is_initialized():
+                send_message("Not set up yet - run /setup or /setup {amount} first")
+                return
+
             # ast.literal_eval, not eval - this text comes straight from a
             # Telegram message, so only literals (dict/number/str) are safe.
             try:
@@ -355,6 +375,9 @@ def handle_message(text, chat_id):
         set_up(amount)
 
     elif command == "/depo":
+        if not _is_initialized():
+            send_message("Not set up yet - run /setup or /setup {amount} first")
+            return
         try:
             amount = float(arg)
         except ValueError:
@@ -367,6 +390,10 @@ def handle_message(text, chat_id):
         deposite_allocation(amount)
 
     elif command == "/status":
+        if not _is_initialized():
+            send_message("Not set up yet - run /setup or /setup {amount} first")
+            return
+
         conn = sqlite3.connect("database/accum.db")
         standings = dict(conn.execute("SELECT ticker, amount FROM standings").fetchall())
         conn.close()
