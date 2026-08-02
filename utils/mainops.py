@@ -304,10 +304,11 @@ def update_ticker(yticker, after):
 
     
 # Text commands the user can send the bot: "/setup" or "/setup {amount}" to
-# (re)initialize and invest, "/depo {amount}" to allocate a deposit, and
+# (re)initialize and invest, "/depo {amount}" to allocate a deposit,
 # "/setup {"TICKER": amount, ...}" as a fallback to directly overwrite one or
 # more fields' tracked standings (e.g. to correct drift by hand, without
-# touching the others or re-running the full invest-from-scratch flow).
+# touching the others or re-running the full invest-from-scratch flow), and
+# "/status" to read back the current standings/ma state.
 # Anything else, or bad input, is reported back rather than raised - an
 # uncaught exception here would take down the whole bot-listener thread.
 @on_message
@@ -364,6 +365,20 @@ def handle_message(text, chat_id):
             return
         logger.info("Received /depo command, amount=%s", amount)
         deposite_allocation(amount)
+
+    elif command == "/status":
+        conn = sqlite3.connect("database/accum.db")
+        standings = dict(conn.execute("SELECT ticker, amount FROM standings").fetchall())
+        conn.close()
+
+        if not standings:
+            send_message("No standings yet - run /setup first")
+            return
+
+        lines = [f"{ticker}: €{amount:.2f}" for ticker, amount in standings.items()]
+        lines.append(f"Total: €{sum(standings.values()):.2f}")
+        send_message("\n".join(lines))
+        logger.info("Received /status command")
 
 
 # callback_data is "update_ticker:{ticker}:{trigger_time}" - partitioned

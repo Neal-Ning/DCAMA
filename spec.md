@@ -38,3 +38,4 @@ Keep a data base containing an amount for each of the 5 stock fields. On start u
 2. Every trading day at 12:00 noon, the bot checks pama status. If a stock pama, user gets notified to invest. If a stock pbma, user gets notified to sell with a button, and must click the button after the sell order has filled.
 3. When user deposites, send message "/depo {amount}". 
 4. As a fall back, user can also send message "/setup {dict}". Where dict is literally a dict in the textual form showing what the script should set the amount of each field to. 
+5. Use "/status" to check the amount that the accum.db is tracking.
